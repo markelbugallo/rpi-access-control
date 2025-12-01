@@ -252,6 +252,15 @@ def login():
             return redirect(url_for('login'))
         else:
             error = "Credenciales incorrectas"
+            # Activar alarma en caso de intento de acceso fallido
+            try:
+                if web_cola_comandos is not None:
+                    web_cola_comandos.put("ALARMA")
+                    print("[Web] Intento de login fallido: alarma activada.")
+                else:
+                    print("[Web] Intento de login fallido: web_cola_comandos no inicializada.")
+            except Exception as e:
+                print(f"[Web Error] No se pudo activar la alarma: {e}")
             
     return render_template_string(HTML_LOGIN, error=error)
 
