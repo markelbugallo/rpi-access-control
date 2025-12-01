@@ -5,7 +5,37 @@ import queue
 import sqlite3
 import datetime
 from flask import Flask, jsonify, render_template_string, request, session, redirect, url_for
-import RPi.GPIO as GPIO
+
+# Intentar importar RPi.GPIO; si falla (por ejemplo en Windows), usar un stub
+try:
+    import RPi.GPIO as GPIO
+except Exception:
+    class _GPIOMock:
+        BCM = 'BCM'
+        HIGH = 1
+        LOW = 0
+        PUD_DOWN = 'PUD_DOWN'
+
+        def __init__(self):
+            self._pins = {}
+
+        def setmode(self, mode):
+            print('[GPIO Stub] setmode', mode)
+
+        def setup(self, pin, mode, pull_up_down=None):
+            self._pins[pin] = self.LOW
+            print(f'[GPIO Stub] setup pin {pin} mode {mode} pull {pull_up_down}')
+
+        def input(self, pin):
+            return self._pins.get(pin, self.LOW)
+
+        def output(self, pin, value):
+            self._pins[pin] = value
+
+        def cleanup(self):
+            print('[GPIO Stub] cleanup')
+
+    GPIO = _GPIOMock()
 
 # --- CONFIGURACIÓN DE PINES (GPIO) ---
 PIN_LED_ROJO = 17
@@ -207,7 +237,7 @@ HTML_DASHBOARD = """
     </script>
 </head>
 <body>
-    <h1>Bienvenido, {{ user }}</h1>
+    <h1>Bienvenido, <span id="user-name">{{ user }}</span></h1>
     
     <div id="status-box" class="status-box red">
         <h2 id="status-text">Cargando...</h2>
@@ -220,6 +250,120 @@ HTML_DASHBOARD = """
     
     <br>
     <a href="/logout" class="logout">Cerrar Sesión</a>
+
+    <!-- Modal de login centrado -->
+    <div id="login-modal" style="position:fixed; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.5);">
+        <div style="background:white; padding:25px; border-radius:8px; width:90%; max-width:360px; text-align:center;">
+            <h2>Acceso Seguro</h2>
+            <div id="login-error" style="color:#e74c3c; font-weight:bold; display:none; margin-bottom:8px;"></div>
+            <input id="login-email" type="email" placeholder="Gmail" style="padding:10px; width:100%; margin:6px 0;">
+            <input id="login-password" type="password" placeholder="Contraseña" style="padding:10px; width:100%; margin:6px 0;">
+            <button id="login-btn" style="padding:10px 20px; margin-top:8px; background:#2ecc71; color:white; border:none; border-radius:5px; cursor:pointer;">Entrar</button>
+        </div>
+    </div>
+
+    <script>
+        // Manejo del modal de login
+        const loginModal = document.getElementById('login-modal');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+        const userNameSpan = document.getElementById('user-name');
+
+        function showLoginModal() {
+            loginModal.style.display = 'flex';
+        }
+        function hideLoginModal() {
+            loginModal.style.display = 'none';
+        }
+
+        loginBtn.addEventListener('click', function(){
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginError.style.display = 'none';
+
+            fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email, password: password})
+            }).then(r => r.json())
+            .then(data => {
+                if(data.status === 'ok'){
+                    hideLoginModal();
+                    userNameSpan.innerText = data.user;
+                } else {
+                    loginError.innerText = data.message || 'Credenciales incorrectas';
+                    loginError.style.display = 'block';
+                }
+            }).catch(e => {
+                loginError.innerText = 'Error de conexión';
+                loginError.style.display = 'block';
+            });
+        });
+
+        // Inicializar mostrando modal si no hay sesión
+        fetch('/api/whoami').then(r => r.json()).then(d => {
+            if(d.user){
+                userNameSpan.innerText = d.user;
+                hideLoginModal();
+            } else {
+                showLoginModal();
+            }
+        }).catch(() => showLoginModal());
+
+        // Actualizar estado manejando 401
+        function actualizarEstado() {
+            fetch('/api/estado')
+                .then(response => {
+                    if(response.status === 401){
+                        // No autenticado: mostrar modal y estado bloqueado
+                        showLoginModal();
+                        const box = document.getElementById('status-box');
+                        const text = document.getElementById('status-text');
+                        box.className = 'status-box red';
+                        text.innerText = 'BLOQUEADO';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if(!data) return;
+                    const box = document.getElementById('status-box');
+                    const text = document.getElementById('status-text');
+                    if (data.estado == 0) {
+                        box.className = 'status-box red';
+                        text.innerText = 'BLOQUEADO';
+                        audio.pause();
+                        audio.currentTime = 0;
+                    } else if (data.estado == 1) {
+                        box.className = 'status-box green';
+                        text.innerText = 'ABIERTO';
+                        audio.pause();
+                        audio.currentTime = 0;
+                    } else {
+                        box.className = 'status-box orange';
+                        text.innerText = '¡ALARMA!';
+                        if (audio.paused) audio.play().catch(e => console.log(e));
+                    }
+                });
+        }
+
+        function enviarOrden(orden) {
+            fetch('/api/control/' + orden)
+                .then(response => {
+                    if(response.status === 401){
+                        alert('Debes iniciar sesión para realizar esta acción');
+                        showLoginModal();
+                        return response.json();
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if(!data) return;
+                    if(data.status == 'denied') alert("¡No tienes permiso para hacer esto!");
+                }).catch(e => console.log(e));
+            setTimeout(actualizarEstado, 200); 
+        }
+    </script>
 </body>
 </html>
 """
@@ -228,41 +372,52 @@ HTML_DASHBOARD = """
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    # Si ya está logueado, lo mandamos al dashboard
-    if 'user' in session:
-        return render_template_string(HTML_DASHBOARD, user=session['user'])
-    
-    error = None
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        
-        # Conectar a la base de datos para verificar usuario
+    # Renderizamos siempre el dashboard; el modal de login se encargará
+    # de solicitar credenciales si no hay sesión.
+    user = session.get('user', '')
+    return render_template_string(HTML_DASHBOARD, user=user)
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json() or {}
+    email = data.get('email')
+    password = data.get('password')
+    if not email or not password:
+        return jsonify({"status": "error", "message": "Faltan credenciales"}), 400
+
+    try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        # Buscamos el usuario por email y contraseña
         cursor.execute("SELECT * FROM usuarios WHERE email=? AND password=?", (email, password))
-        usuario = cursor.fetchone() # Devuelve una tupla o None
+        usuario = cursor.fetchone()
         conn.close()
-        
-        if usuario:
-            # usuario[0]=email, [1]=pass, [2]=permiso
-            session['user'] = email
-            session['permiso'] = usuario[2] # Guardamos si tiene permiso (1 o 0)
-            return redirect(url_for('login'))
-        else:
-            error = "Credenciales incorrectas"
-            # Activar alarma en caso de intento de acceso fallido
-            try:
-                if web_cola_comandos is not None:
-                    web_cola_comandos.put("ALARMA")
-                    print("[Web] Intento de login fallido: alarma activada.")
-                else:
-                    print("[Web] Intento de login fallido: web_cola_comandos no inicializada.")
-            except Exception as e:
-                print(f"[Web Error] No se pudo activar la alarma: {e}")
-            
-    return render_template_string(HTML_LOGIN, error=error)
+    except Exception as e:
+        print(f"[BD Error] {e}")
+        return jsonify({"status": "error", "message": "Error de base de datos"}), 500
+
+    if usuario:
+        session['user'] = email
+        session['permiso'] = usuario[2]
+        return jsonify({"status": "ok", "user": email})
+    else:
+        # Activar alarma en caso de intento fallido
+        try:
+            if web_cola_comandos is not None:
+                web_cola_comandos.put("ALARMA")
+                print("[Web] Intento de login fallido (API): alarma activada.")
+            else:
+                print("[Web] Intento de login fallido (API): web_cola_comandos no inicializada.")
+        except Exception as e:
+            print(f"[Web Error] No se pudo activar la alarma: {e}")
+        return jsonify({"status": "error", "message": "Credenciales incorrectas"}), 401
+
+
+@app.route('/api/whoami')
+def api_whoami():
+    if 'user' in session:
+        return jsonify({"user": session['user']})
+    return jsonify({"user": ""})
 
 @app.route('/logout')
 def logout():
