@@ -41,7 +41,10 @@ except Exception:
 PIN_LED_ROJO = 17
 PIN_LED_VERDE = 27
 PIN_BOTON = 22
-PIN_ZUMBADOR = 23   # Opcional si tienes zumbador
+PIN_ZUMBADOR = 23   
+# --- NUEVOS COMPONENTES ---
+PIN_PIR = 24        # Sensor Mini PIR v1.0 (Pin físico 18)
+PIN_LED_AZUL = 25   # LED Azul de presencia (Pin físico 22)
 
 # --- ESTADOS DEL SISTEMA ---
 ESTADO_BLOQUEADO = 0
@@ -53,13 +56,18 @@ ESTADO_ALARMA = 2
 # ==========================================
 def proceso_hardware(memoria_estado, cola_comandos):
     """
-    Controla LEDs y Botón físico.
+    Controla LEDs, Botón físico, Zumbador y Sensor PIR.
     """
     GPIO.setmode(GPIO.BCM)
+    # Salidas
     GPIO.setup(PIN_LED_ROJO, GPIO.OUT)
     GPIO.setup(PIN_LED_VERDE, GPIO.OUT)
-    GPIO.setup(PIN_ZUMBADOR, GPIO.OUT) # Si tienes zumbador
+    GPIO.setup(PIN_ZUMBADOR, GPIO.OUT)
+    GPIO.setup(PIN_LED_AZUL, GPIO.OUT) # Nuevo LED Azul
+    
+    # Entradas
     GPIO.setup(PIN_BOTON, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.setup(PIN_PIR, GPIO.IN)       # El PIR envía señal HIGH/LOW
 
     # --- HILO 1: LECTURA DEL BOTÓN ---
     def hilo_escuchar_boton():
@@ -70,7 +78,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
 
                 while GPIO.input(PIN_BOTON) == GPIO.HIGH:
                     if time.time() - start_time > 2.0:
-                        print("[Hardware] ¡Pulsación Larga! -> ALARMA")
+                        print("[Hardware] ¡Pulsación Larga! -> ALARMA MANUAL")
                         memoria_estado.value = ESTADO_ALARMA
                         while GPIO.input(PIN_BOTON) == GPIO.HIGH:
                             time.sleep(0.1)
@@ -88,7 +96,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
                 time.sleep(0.3)
             time.sleep(0.05)
 
-    # --- HILO 2: CONTROL DE LUCES ---
+    # --- HILO 2: CONTROL DE LUCES (ROJO/VERDE/ZUMBADOR) ---
     def hilo_control_leds():
         while True:
             estado_actual = memoria_estado.value
@@ -106,22 +114,49 @@ def proceso_hardware(memoria_estado, cola_comandos):
                 time.sleep(0.1)
                 
             elif estado_actual == ESTADO_ALARMA:
-                # Alarma visual y sonora
+                # Alarma visual (Rojo) y sonora
                 GPIO.output(PIN_LED_ROJO, GPIO.HIGH)
-                GPIO.output(PIN_ZUMBADOR, GPIO.HIGH) # Sonido
+                GPIO.output(PIN_ZUMBADOR, GPIO.HIGH)
                 time.sleep(0.2)
                 GPIO.output(PIN_LED_ROJO, GPIO.LOW)
                 GPIO.output(PIN_ZUMBADOR, GPIO.LOW)
                 GPIO.output(PIN_LED_VERDE, GPIO.LOW)
                 time.sleep(0.2)
 
+    # --- HILO 3: VIGILANCIA PIR (NUEVO) ---
+    def hilo_sensor_pir():
+        print("[Sensor] Iniciando vigilancia con Mini PIR...")
+        while True:
+            # El Mini PIR pone el pin en HIGH cuando detecta movimiento
+            if GPIO.input(PIN_PIR) == 1:
+                # Feedback visual: Encender LED Azul
+                GPIO.output(PIN_LED_AZUL, GPIO.HIGH)
+                
+                # LÓGICA DE SEGURIDAD:
+                # Si el sistema está BLOQUEADO y hay movimiento -> ALARMA
+                if memoria_estado.value == ESTADO_BLOQUEADO:
+                    print("[Sensor] ¡MOVIMIENTO DETECTADO EN ZONA BLOQUEADA! -> ALARMA")
+                    memoria_estado.value = ESTADO_ALARMA
+                
+                # Mantenemos el LED azul encendido un poco para que se vea bien
+                time.sleep(1.0) 
+            else:
+                GPIO.output(PIN_LED_AZUL, GPIO.LOW)
+            
+            time.sleep(0.1) # Pequeña pausa para no saturar CPU
+
     # Iniciar hilos
     t1 = threading.Thread(target=hilo_escuchar_boton)
     t2 = threading.Thread(target=hilo_control_leds)
+    t3 = threading.Thread(target=hilo_sensor_pir) # Nuevo hilo del PIR
+    
     t1.daemon = True
     t2.daemon = True
+    t3.daemon = True
+    
     t1.start()
     t2.start()
+    t3.start()
 
     # Bucle principal
     print("[Hardware] Hardware listo.")
@@ -143,7 +178,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
 # PROCESO 2: SERVIDOR WEB (CON LOGIN Y BASE DE DATOS)
 # ==========================================
 app = Flask(__name__)
-app.secret_key = "clave_super_secreta_proyecto" # Necesario para sesiones
+app.secret_key = "clave_super_secreta_proyecto" 
 
 web_memoria_estado = None
 web_cola_comandos = None
@@ -209,7 +244,7 @@ HTML_DASHBOARD = """
                     
                     if (data.estado == 0) {
                         box.className = 'status-box red';
-                        text.innerText = 'BLOQUEADO';
+                        text.innerText = 'BLOQUEADO (Vigilancia)';
                         audio.pause();
                         audio.currentTime = 0;
                     } else if (data.estado == 1) {
@@ -219,7 +254,7 @@ HTML_DASHBOARD = """
                         audio.currentTime = 0;
                     } else {
                         box.className = 'status-box orange';
-                        text.innerText = '¡ALARMA!';
+                        text.innerText = '¡ALARMA! INTRUSO DETECTADO';
                         if (audio.paused) audio.play().catch(e => console.log(e));
                     }
                 });
@@ -228,10 +263,18 @@ HTML_DASHBOARD = """
 
         function enviarOrden(orden) {
             fetch('/api/control/' + orden)
-                .then(response => response.json())
+                .then(response => {
+                    if(response.status === 401){
+                        alert('Debes iniciar sesión para realizar esta acción');
+                        showLoginModal();
+                        return response.json();
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    if(!data) return;
                     if(data.status == 'denied') alert("¡No tienes permiso para hacer esto!");
-                });
+                }).catch(e => console.log(e));
             setTimeout(actualizarEstado, 200); 
         }
     </script>
@@ -251,7 +294,6 @@ HTML_DASHBOARD = """
     <br>
     <a href="/logout" class="logout">Cerrar Sesión</a>
 
-    <!-- Modal de login centrado -->
     <div id="login-modal" style="position:fixed; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.5);">
         <div style="background:white; padding:25px; border-radius:8px; width:90%; max-width:360px; text-align:center;">
             <h2>Acceso Seguro</h2>
@@ -309,60 +351,6 @@ HTML_DASHBOARD = """
                 showLoginModal();
             }
         }).catch(() => showLoginModal());
-
-        // Actualizar estado manejando 401
-        function actualizarEstado() {
-            fetch('/api/estado')
-                .then(response => {
-                    if(response.status === 401){
-                        // No autenticado: mostrar modal y estado bloqueado
-                        showLoginModal();
-                        const box = document.getElementById('status-box');
-                        const text = document.getElementById('status-text');
-                        box.className = 'status-box red';
-                        text.innerText = 'BLOQUEADO';
-                        return null;
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if(!data) return;
-                    const box = document.getElementById('status-box');
-                    const text = document.getElementById('status-text');
-                    if (data.estado == 0) {
-                        box.className = 'status-box red';
-                        text.innerText = 'BLOQUEADO';
-                        audio.pause();
-                        audio.currentTime = 0;
-                    } else if (data.estado == 1) {
-                        box.className = 'status-box green';
-                        text.innerText = 'ABIERTO';
-                        audio.pause();
-                        audio.currentTime = 0;
-                    } else {
-                        box.className = 'status-box orange';
-                        text.innerText = '¡ALARMA!';
-                        if (audio.paused) audio.play().catch(e => console.log(e));
-                    }
-                });
-        }
-
-        function enviarOrden(orden) {
-            fetch('/api/control/' + orden)
-                .then(response => {
-                    if(response.status === 401){
-                        alert('Debes iniciar sesión para realizar esta acción');
-                        showLoginModal();
-                        return response.json();
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if(!data) return;
-                    if(data.status == 'denied') alert("¡No tienes permiso para hacer esto!");
-                }).catch(e => console.log(e));
-            setTimeout(actualizarEstado, 200); 
-        }
     </script>
 </body>
 </html>
@@ -372,8 +360,6 @@ HTML_DASHBOARD = """
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    # Renderizamos siempre el dashboard; el modal de login se encargará
-    # de solicitar credenciales si no hay sesión.
     user = session.get('user', '')
     return render_template_string(HTML_DASHBOARD, user=user)
 
@@ -405,9 +391,6 @@ def api_login():
         try:
             if web_cola_comandos is not None:
                 web_cola_comandos.put("ALARMA")
-                print("[Web] Intento de login fallido (API): alarma activada.")
-            else:
-                print("[Web] Intento de login fallido (API): web_cola_comandos no inicializada.")
         except Exception as e:
             print(f"[Web Error] No se pudo activar la alarma: {e}")
         return jsonify({"status": "error", "message": "Credenciales incorrectas"}), 401
@@ -433,16 +416,12 @@ def get_estado():
 
 @app.route('/api/control/<accion>')
 def control(accion):
-    # Verificamos si está logueado
     if 'user' not in session: 
         return jsonify({"status": "error", "message": "No logueado"}), 401
 
-    # Verificamos permisos de base de datos para acciones críticas (Abrir)
     if accion == "abrir":
         if session.get('permiso') == 1:
             web_cola_comandos.put("ABRIR")
-            
-            # --- GUARDAR EN BASE DE DATOS LA FECHA ---
             try:
                 conn = sqlite3.connect(DB_NAME)
                 cursor = conn.cursor()
@@ -450,13 +429,10 @@ def control(accion):
                 cursor.execute("UPDATE usuarios SET ultimo_acceso = ? WHERE email = ?", (fecha_hora, session['user']))
                 conn.commit()
                 conn.close()
-                print(f"[BD] Acceso registrado para {session['user']} a las {fecha_hora}")
             except Exception as e:
                 print(f"[BD Error] {e}")
-
             return jsonify({"status": "ok"})
         else:
-            # Si permiso es 0
             return jsonify({"status": "denied"})
     
     elif accion == "cerrar":
@@ -476,17 +452,14 @@ def iniciar_servidor_web(memoria, cola):
 # MAIN
 # ==========================================
 if __name__ == '__main__':
-    print("--- Sistema de Acceso con Base de Datos ---")
+    print("--- Sistema de Acceso con Base de Datos, PIR y LED Azul ---")
     
-    # Crear cola y memoria compartida
     memoria_compartida = multiprocessing.Value('i', ESTADO_BLOQUEADO)
     cola_comunicacion = multiprocessing.Queue()
 
-    # Definir Procesos
     proc_hw = multiprocessing.Process(target=proceso_hardware, args=(memoria_compartida, cola_comunicacion))
     proc_web = multiprocessing.Process(target=iniciar_servidor_web, args=(memoria_compartida, cola_comunicacion))
 
-    # Arrancar
     proc_hw.start()
     proc_web.start()
 
