@@ -177,9 +177,12 @@ def control(accion):
         
     return jsonify({"status": "ok"})
 
-def iniciar_servidor_web(memoria, cola):
-    global web_memoria_estado, web_cola_comandos
-    web_memoria_estado = memoria
+def iniciar_servidor_web(memoria_estado, memoria_pir, memoria_modo, cola):
+    global web_memoria_estado, web_memoria_pir, web_memoria_modo, web_cola_comandos
+
+    web_memoria_estado = memoria_estado
+    web_memoria_pir = memoria_pir
+    web_memoria_modo = memoria_modo
     web_cola_comandos = cola
 
     log = logging.getLogger('werkzeug')

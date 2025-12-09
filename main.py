@@ -46,11 +46,15 @@ def comprobar_e_instalar_bd():
 if __name__ == '__main__':
     comprobar_e_instalar_bd()
 
-    memoria_compartida = multiprocessing.Value('i', ESTADO_BLOQUEADO)
+    # MEMORIAS COMPARTIDAS
+    memoria_estado = multiprocessing.Value('i', ESTADO_BLOQUEADO)
+    memoria_pir = multiprocessing.Value('i', 0)
+    memoria_modo = multiprocessing.Value('i', 1)
+
     cola_comunicacion = multiprocessing.Queue()
 
-    proc_hw = multiprocessing.Process(target=proceso_hardware, args=(memoria_compartida, cola_comunicacion))
-    proc_web = multiprocessing.Process(target=iniciar_servidor_web, args=(memoria_compartida, cola_comunicacion))
+    proc_hw = multiprocessing.Process(target=proceso_hardware, args=(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion))
+    proc_web = multiprocessing.Process(target=iniciar_servidor_web, args=(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion))
 
     proc_hw.start()
     proc_web.start()

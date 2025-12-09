@@ -26,7 +26,7 @@ ESTADO_ESPERANDO_CODIGO = 3
 ID_USUARIO_HARDWARE = 2
 
 
-def proceso_hardware(memoria_estado, cola_comandos):
+def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion):
 
     CARPETA_ACTUAL = os.path.dirname(os.path.abspath(__file__))
     DB_PATH = os.path.join(CARPETA_ACTUAL, 'data', 'accesos.db')
@@ -169,6 +169,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
         print("[PIR] Vigilancia activa.")
         
         while True:
+            memoria_pir.value = GPIO.input(PIN_PIR)
             # Si estamos introduciendo el código, el sensor no cuenta los ciclos que estamos ahi.
             if memoria_estado.value == ESTADO_ESPERANDO_CODIGO:
                 contador_ciclos_dia = 0
@@ -269,7 +270,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
     try:
         while True:
             try:
-                orden = cola_comandos.get(timeout=0.5)
+                orden = cola_comunicacion.get(timeout=0.5)
                 
                 if orden == "SALIR": break
                 
@@ -282,13 +283,13 @@ def proceso_hardware(memoria_estado, cola_comandos):
                 elif orden == "MODO_DIA": 
                     configuracion["empresa_abierta"] = True
                     # IMPORTANTE: Avisar a la web del cambio
-                    memoria_estado.value = 1 
+                    memoria_modo.value = 1 
                     print(" -> Modo DÍA.")
 
                 elif orden == "MODO_NOCHE": 
                     configuracion["empresa_abierta"] = False
                     # IMPORTANTE: Avisar a la web del cambio
-                    memoria_estado.value = 0 
+                    memoria_modo.value = 0 
                     print(" -> Modo NOCHE.")
 
                 elif orden == "ABRIR": 
