@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestión Usuarios</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn-del { background: #e74c3c; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>Gestión de Usuarios</h2>
+    <a href="/dashboard">← Volver al Dashboard</a>
+
+    <div style="background:#ecf0f1; padding:15px; border-radius:8px; margin-top:20px;">
+        <h3>Añadir Nuevo Usuario (Seguridad)</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="crear">
+            <input type="email" name="email" placeholder="Email" required style="padding:8px;">
+            <input type="password" name="password" placeholder="Contraseña" required style="padding:8px;">
+            <button type="submit" style="padding:8px 15px; background:#2ecc71; color:white; border:none; cursor:pointer;">Crear</button>
+        </form>
+    </div>
+
+    <h3>Usuarios Existentes</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Permiso</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in usuarios %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>{{ u.email }}</td>
+                <td>
+                    {% if u.permiso == 1 %} <strong>ADMIN</strong>
+                    {% elif u.id == 2 %} <em>SISTEMA</em>
+                    {% else %} Seguridad {% endif %}
+                </td>
+                <td>
+                    {% if u.id > 2 %}
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="action" value="borrar">
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <button type="submit" class="btn-del">Eliminar</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

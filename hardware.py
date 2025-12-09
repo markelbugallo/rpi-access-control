@@ -1,6 +1,8 @@
+import sqlite3
 import threading
 import time
 import queue
+import os
 import RPi.GPIO as GPIO
 
 # ==========================================
@@ -12,20 +14,40 @@ PIN_LED_AZUL = 22
 PIN_BOTON = 23
 PIN_PIR = 25
 
-# ==========================================
+# ======================
 # 2. ESTADOS DEL SISTEMA
-# ==========================================
+# ======================
 ESTADO_BLOQUEADO = 0
 ESTADO_ABIERTO = 1
 ESTADO_ALARMA = 2
 ESTADO_ESPERANDO_CODIGO = 3
 
-# Variable para saber si es de día (Empresa Abierta) o noche
-configuracion = {
-    "empresa_abierta": True  # Por defecto empezamos en modo DÍA
-}
+# definimos id hardware, siempre es 2
+ID_USUARIO_HARDWARE = 2
 
-def proceso_hardware(memoria_estado, cola_comandos):    
+
+def proceso_hardware(memoria_estado, cola_comandos):
+
+    CARPETA_ACTUAL = os.path.dirname(os.path.abspath(__file__))
+    DB_PATH = os.path.join(CARPETA_ACTUAL, 'data', 'accesos.db')
+
+    configuracion = {"empresa_abierta": True}
+    estado_interno = {"ultimo_reset": 0}
+
+    def registrar_evento(accion):
+        """Abre conexión, inserta evento y cierra conexión."""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            query = "INSERT INTO historial (usuario_id, accion) VALUES (?, ?)"
+            cur.execute(query, (ID_USUARIO_HARDWARE, accion))
+            conn.commit()
+            conn.close()
+            # Opcional: Imprimir también en consola para debug
+            print(f"[BD Guardado] Acción: {accion}")
+        except Exception as e:
+            print(f"[ERROR BD] No se pudo guardar historial: {e}")
+
     # --- CONFIGURACIÓN GPIO ---
     GPIO.setmode(GPIO.BCM)
     
@@ -58,6 +80,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
             if time.time() - tiempo_inicio > 15.0:
                 print("[Código] ¡Tiempo agotado! -> ALARMA")
                 memoria_estado.value = ESTADO_ALARMA
+                registrar_evento("ALARMA: Tiempo de código agotado")
                 return
 
             # 2. Detectar pulsación
@@ -88,9 +111,11 @@ def proceso_hardware(memoria_estado, cola_comandos):
                     if secuencia == ['C', 'C', 'L']:
                         print("[Código] ¡COMBINACIÓN CORRECTA! -> Abriendo puerta")
                         memoria_estado.value = ESTADO_ABIERTO
+                        registrar_evento("APERTURA: Código correcto")
                     else:
                         print(f"[Código] Fallaste ({secuencia}) -> ALARMA")
                         memoria_estado.value = ESTADO_ALARMA
+                        registrar_evento(f"ALARMA: Código incorrecto {secuencia}")
                     return
 
             time.sleep(0.05)
@@ -132,6 +157,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
                     while GPIO.input(PIN_BOTON) == GPIO.HIGH: time.sleep(0.1)
                     memoria_estado.value = ESTADO_BLOQUEADO
                     print("[Botón] Puerta cerrada manualmente.")
+                    registrar_evento("CIERRE: Botón manual")
 
             time.sleep(0.05)
 
@@ -149,6 +175,12 @@ def proceso_hardware(memoria_estado, cola_comandos):
                 time.sleep(0.5)
                 continue
 
+
+            if time.time() - estado_interno["ultimo_reset"] < 5.0:
+                contador_ciclos_dia = 0
+                time.sleep(0.5)
+                continue
+
             # El sensor solo nos importa si la puerta está BLOQUEADA
             if memoria_estado.value == ESTADO_BLOQUEADO:
                 
@@ -161,6 +193,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
                     if configuracion["empresa_abierta"] == False:
                         print("[PIR Noche] ¡INTRUSO! Alarma inmediata.")
                         memoria_estado.value = ESTADO_ALARMA
+                        registrar_evento("ALARMA: Intruso detectado")
                     
                     # --- SITUACIÓN B: (Empresa Abierta) ---
                     else:
@@ -170,6 +203,7 @@ def proceso_hardware(memoria_estado, cola_comandos):
                         if contador_ciclos_dia >= 3:
                             print("[PIR Día] ¡Demasiado tiempo, sospechoso! -> ALARMA")
                             memoria_estado.value = ESTADO_ALARMA
+                            registrar_evento("ALARMA: Movimiento persistente")
                         else:
                             time.sleep(8.0)
                 else:
@@ -235,24 +269,35 @@ def proceso_hardware(memoria_estado, cola_comandos):
     try:
         while True:
             try:
-                # Esperamos órdenes de la "Web" (o del futuro main.py)
-                orden = cola_comandos.get(timeout=1.0)
-                print(f"[COMANDO] Recibido: {orden}")
+                orden = cola_comandos.get(timeout=0.5)
                 
-                if orden == "ALARMA_OFF":
+                if orden == "SALIR": break
+                
+                elif orden == "ALARMA_OFF": 
                     memoria_estado.value = ESTADO_BLOQUEADO
-                    print(" -> Alarma reiniciada.")
-                
-                elif orden == "MODO_DIA":
+                    # IMPORTANTE: Guardamos la hora actual para activar la pausa de 5s
+                    estado_interno["ultimo_reset"] = time.time()
+                    print(" -> Alarma OFF (Pausa de 5s).")
+
+                elif orden == "MODO_DIA": 
                     configuracion["empresa_abierta"] = True
-                    print(" -> Modo DÍA activado.")
+                    # IMPORTANTE: Avisar a la web del cambio
+                    memoria_estado.value = 1 
+                    print(" -> Modo DÍA.")
 
-                elif orden == "MODO_NOCHE":
+                elif orden == "MODO_NOCHE": 
                     configuracion["empresa_abierta"] = False
-                    print(" -> Modo NOCHE activado.")
+                    # IMPORTANTE: Avisar a la web del cambio
+                    memoria_estado.value = 0 
+                    print(" -> Modo NOCHE.")
 
-            except queue.Empty:
-                pass
+                elif orden == "ABRIR": 
+                    memoria_estado.value = ESTADO_ABIERTO
+                    
+                elif orden == "CERRAR": 
+                    memoria_estado.value = ESTADO_BLOQUEADO
+
+            except queue.Empty: pass
     except KeyboardInterrupt:
         print("\nApagando sistema...")
     finally:

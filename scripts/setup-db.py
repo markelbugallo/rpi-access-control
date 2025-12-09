@@ -75,6 +75,9 @@ def main():
         # Insertar el Admin con los datos que acabamos de pedir
         cur.execute("INSERT OR IGNORE INTO usuarios (email, password, permiso) VALUES (?, ?, ?)", (email, password_final, 1))
 
+        # Insertar un usuario hardware para registrar los movimientos que se hacen desde el boton fisico
+        cur.execute("INSERT OR IGNORE INTO usuarios (id, email, password, permiso) VALUES (?, ?, ?, ?)", (2, 'sistema@hardware', 'SYSTEM_INTERNAL_USER_DO_NOT_LOGIN', 0))
+
         conn.commit()
         conn.close()
         

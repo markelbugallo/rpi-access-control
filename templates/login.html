@@ -7,27 +7,34 @@
         body { font-family: sans-serif; text-align: center; padding: 50px; background: #2c3e50; color: white;}
         input { padding: 10px; margin: 10px; width: 80%; max-width: 300px; border-radius: 5px; border: none;}
         button { padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;}
-        .error { color: #e74c3c; font-weight: bold; }
+        .error { color: #e74c3c; font-weight: bold; background: white; padding: 10px; border-radius: 5px; display: none; margin-bottom: 15px;}
     </style>
 </head>
 <body>
     <h2>Acceso Seguro</h2>
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% endif %}
-    <form method="post">
-        <input type="email" name="email" placeholder="Gmail" required><br>
-        <input type="password" name="password" placeholder="Contraseña" required><br>
+    
+    <div id="mensaje-error" class="error"></div>
+
+    <form onsubmit="hacerLogin(event)">
+        <input type="email" id="email" name="email" placeholder="Gmail" required><br>
+        <input type="password" id="password" name="password" placeholder="Contraseña" required><br>
         <button type="submit">Entrar</button>
     </form>
 
     <script>
         async function hacerLogin(event) {
-            event.preventDefault(); // Evita que el formulario recargue la página
+            event.preventDefault(); // Evita que se recargue la página
             
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
+            // Ahora esto funcionará porque los inputs tienen ID
+            const emailElement = document.getElementById('email');
+            const passwordElement = document.getElementById('password');
             const errorBox = document.getElementById('mensaje-error');
+
+            const email = emailElement.value;
+            const password = passwordElement.value;
+            
+            // Limpiamos errores previos
+            errorBox.style.display = 'none';
 
             try {
                 const response = await fetch('/api/login', {
@@ -39,14 +46,15 @@
                 const data = await response.json();
 
                 if (data.status === 'ok') {
-                    // ¡ÉXITO! Redirigimos a la sala VIP
+                    // ¡ÉXITO! Redirigimos al dashboard
                     window.location.href = '/dashboard';
                 } else {
                     // ERROR: Mostramos el mensaje
-                    errorBox.innerText = data.message || "Error desconocido";
+                    errorBox.innerText = data.message || "Credenciales incorrectas";
                     errorBox.style.display = "block";
                 }
             } catch (e) {
+                console.error(e);
                 errorBox.innerText = "Error de conexión con la Raspberry Pi";
                 errorBox.style.display = "block";
             }
