@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login RPi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #2c3e50; color: white;}
+        input { padding: 10px; margin: 10px; width: 80%; max-width: 300px; border-radius: 5px; border: none;}
+        button { padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;}
+        .error { color: #e74c3c; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Acceso Seguro</h2>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+    <form method="post">
+        <input type="email" name="email" placeholder="Gmail" required><br>
+        <input type="password" name="password" placeholder="Contraseña" required><br>
+        <button type="submit">Entrar</button>
+    </form>
+
+    <script>
+        async function hacerLogin(event) {
+            event.preventDefault(); // Evita que el formulario recargue la página
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorBox = document.getElementById('mensaje-error');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: email, password: password })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    // ¡ÉXITO! Redirigimos a la sala VIP
+                    window.location.href = '/dashboard';
+                } else {
+                    // ERROR: Mostramos el mensaje
+                    errorBox.innerText = data.message || "Error desconocido";
+                    errorBox.style.display = "block";
+                }
+            } catch (e) {
+                errorBox.innerText = "Error de conexión con la Raspberry Pi";
+                errorBox.style.display = "block";
+            }
+        }
+    </script>
+</body>
+</html>

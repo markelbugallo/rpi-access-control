@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel de Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
+        .status-box { padding: 20px; border-radius: 10px; color: white; margin: 20px auto; max-width: 300px;}
+        .red { background-color: #e74c3c; }
+        .green { background-color: #2ecc71; }
+        .orange { background-color: #f39c12; animation: blink 0.5s infinite; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; }
+        .logout { margin-top: 50px; display: inline-block; color: #7f8c8d; text-decoration: none;}
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+    <audio id="alarma-audio" loop>
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-security-facility-breach-alarm-994.mp3" type="audio/mpeg">
+    </audio>
+    <script>
+        var audio = document.getElementById("alarma-audio");
+
+        function actualizarEstado() {
+            fetch('/api/estado')
+                .then(response => response.json())
+                .then(data => {
+                    const box = document.getElementById('status-box');
+                    const text = document.getElementById('status-text');
+                    
+                    if (data.estado == 0) {
+                        box.className = 'status-box red';
+                        text.innerText = 'BLOQUEADO (Vigilancia)';
+                        audio.pause();
+                        audio.currentTime = 0;
+                    } else if (data.estado == 1) {
+                        box.className = 'status-box green';
+                        text.innerText = 'ABIERTO';
+                        audio.pause();
+                        audio.currentTime = 0;
+                    } else {
+                        box.className = 'status-box orange';
+                        text.innerText = '¡ALARMA! INTRUSO DETECTADO';
+                        if (audio.paused) audio.play().catch(e => console.log(e));
+                    }
+                });
+        }
+        setInterval(actualizarEstado, 1000);
+
+        function enviarOrden(orden) {
+            fetch('/api/control/' + orden)
+                .then(response => {
+                    if(response.status === 401){
+                        alert('Debes iniciar sesión para realizar esta acción');
+                        showLoginModal();
+                        return response.json();
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if(!data) return;
+                    if(data.status == 'denied') alert("¡No tienes permiso para hacer esto!");
+                }).catch(e => console.log(e));
+            setTimeout(actualizarEstado, 200); 
+        }
+    </script>
+</head>
+<body>
+    <h1>Bienvenido, <span id="user-name">{{ user }}</span></h1>
+    
+    <div id="status-box" class="status-box red">
+        <h2 id="status-text">Cargando...</h2>
+    </div>
+
+    <button onclick="enviarOrden('abrir')">ABRIR PUERTA</button>
+    <button onclick="enviarOrden('cerrar')">BLOQUEAR</button>
+    <br>
+    <button onclick="enviarOrden('alarma')" style="background:black; color:white;">ACTIVAR ALARMA</button>
+    
+    <br>
+    <a href="/logout" class="logout">Cerrar Sesión</a>
+
+    <div id="login-modal" style="position:fixed; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.5);">
+        <div style="background:white; padding:25px; border-radius:8px; width:90%; max-width:360px; text-align:center;">
+            <h2>Acceso Seguro</h2>
+            <div id="login-error" style="color:#e74c3c; font-weight:bold; display:none; margin-bottom:8px;"></div>
+            <input id="login-email" type="email" placeholder="Gmail" style="padding:10px; width:100%; margin:6px 0;">
+            <input id="login-password" type="password" placeholder="Contraseña" style="padding:10px; width:100%; margin:6px 0;">
+            <button id="login-btn" style="padding:10px 20px; margin-top:8px; background:#2ecc71; color:white; border:none; border-radius:5px; cursor:pointer;">Entrar</button>
+        </div>
+    </div>
+</body>
+</html>
