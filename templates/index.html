@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">SeguridadApp</div>
+        <div class="nav-links">
+            <span style="font-size: 0.9rem; opacity: 0.8;">Hola, {{ user }}</span>
+            {% if es_admin %}
+                <a href="/admin/usuarios">Usuarios</a>
+                <a href="/admin/historial">Historial</a>
+            {% endif %}
+            <a href="/logout" class="logout-btn">Salir</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="status-grid">
+            <div id="door-box" class="status-box bg-grey">
+                <h3>Estado Puerta</h3>
+                <h2 id="door-text">Conectando...</h2>
+            </div>
+
+            <div id="sensor-box" class="status-box bg-grey">
+                <h3>Sensor PIR</h3>
+                <h2 id="sensor-text">--</h2>
+            </div>
+
+            <div id="mode-box" class="status-box bg-grey">
+                <h3>Modo Empresa</h3>
+                <h2 id="mode-text">--</h2>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Control Manual</h3>
+            <div class="controls-group">
+                <button class="btn-open" onclick="orden('abrir')">ABRIR PUERTA</button>
+                <button class="btn-close" onclick="orden('cerrar')">CERRAR / BLOQUEAR</button>
+                <button class="btn-warn" onclick="orden('alarma_off')">SILENCIAR ALARMA</button>
+            </div>
+            
+            <h3 style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">Configuración</h3>
+            <div class="controls-group">
+                <button class="btn-info" onclick="orden('modo_dia')">MODO DÍA</button>
+                <button class="btn-dark" onclick="orden('modo_noche')">MODO NOCHE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateState() {
+            fetch('/api/estado')
+            .then(res => res.json())
+            .then(data => {
+                const doorBox = document.getElementById('door-box');
+                const doorText = document.getElementById('door-text');
+                const sensorBox = document.getElementById('sensor-box');
+                const modeBox = document.getElementById('mode-box');
+
+                // 1. PUERTA: Limpiamos todas las clases de color y ponemos la correcta
+                doorBox.className = 'status-box'; 
+                if (data.estado === 0) {
+                    doorBox.classList.add('bg-red');
+                    doorText.innerText = "BLOQUEADA";
+                } else if (data.estado === 1) {
+                    doorBox.classList.add('bg-green');
+                    doorText.innerText = "ABIERTA";
+                } else if (data.estado === 2) {
+                    doorBox.classList.add('bg-orange');
+                    doorText.innerText = "¡ALARMA!";
+                } else if (data.estado === 3) {
+                    doorBox.classList.add('bg-yellow');
+                    doorText.innerText = "ESPERANDO CÓDIGO";
+                }
+
+                // 2. SENSOR
+                sensorBox.className = 'status-box';
+                if (data.sensor === 1) {
+                    sensorBox.classList.add('bg-orange');
+                    sensorBox.innerText = "¡MOVIMIENTO!";
+                } else {
+                    sensorBox.classList.add('bg-grey');
+                    sensorBox.innerText = "Quieto";
+                }
+
+                // 3. MODO
+                modeBox.className = 'status-box';
+                if (data.modo_dia === 1) {
+                    modeBox.classList.add('bg-blue');
+                    modeBox.innerText = "DÍA";
+                } else {
+                    modeBox.classList.add('bg-dark');
+                    modeBox.innerText = "NOCHE";
+                }
+            });
+        }
+
+        function orden(accion) {
+            fetch('/api/control/' + accion).then(res => updateState());
+        }
+
+        setInterval(updateState, 500);
+    </script>
+</body>
+</html>

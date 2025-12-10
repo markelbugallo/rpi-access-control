@@ -38,7 +38,7 @@ def registrar_evento(usuario_id, accion):
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'user' in session:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('index'))
     
     # Si no esta logeado, mostramos el formulario de login
     return render_template('login.html')
@@ -73,21 +73,21 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# DASHBOARD PRINCIPAL
-@app.route('/dashboard')
-def dashboard():
+# PAGINA PRINCIPAL (index)
+@app.route('/index')
+def index():
     if 'user' not in session:
         return redirect(url_for('login'))
     
     es_admin = (session.get('permiso') == 1)
-    return render_template('dashboard.html', user=session['user'], es_admin=es_admin)
+    return render_template('index.html', user=session['user'], es_admin=es_admin)
 
 
 # RUTAS ADMIN
 @app.route('/admin/usuarios', methods=['GET', 'POST'])
 def admin_usuarios():
     # Protección: Solo admin (permiso 1)
-    if session.get('permiso') != 1: return redirect(url_for('dashboard'))
+    if session.get('permiso') != 1: return redirect(url_for('index'))
 
     conn = get_db_connection()
     
@@ -123,7 +123,7 @@ def admin_usuarios():
 
 @app.route('/admin/historial')
 def admin_historial():
-    if session.get('permiso') != 1: return redirect(url_for('dashboard'))
+    if session.get('permiso') != 1: return redirect(url_for('index'))
 
     conn = get_db_connection()
 

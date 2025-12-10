@@ -1,45 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
     <title>Historial de Accesos</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #2c3e50; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h2>Historial de Eventos y Accesos</h2>
-    <a href="/dashboard">← Volver al Dashboard</a>
+    
+    <nav class="navbar">
+        <div class="logo">SeguridadApp</div>
+        <div class="nav-links">
+            <a href="/index">Inicio</a>
+            <a href="/admin/usuarios">Usuarios</a>
+            <a href="/admin/historial" class="active">Historial</a>
+            <a href="/logout" class="logout-btn">Salir</a>
+        </div>
+    </nav>
 
-    <table>
-        <thead>
-            <tr>
-                <th>ID Evento</th>
-                <th>Fecha / Hora</th>
-                <th>Usuario</th>
-                <th>Acción / Descripción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.id }}</td>
-                <td>{{ log.fecha }}</td>
-                <td>
-                    {% if log.email %} 
-                        <strong>{{ log.email }}</strong>
-                    {% else %}
-                        <em>Sistema / Desconocido</em>
-                    {% endif %}
-                </td>
-                <td>{{ log.accion }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="container">
+        <h2>Registro de Eventos</h2>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Fecha / Hora</th>
+                            <th>Usuario</th>
+                            <th>Acción / Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>#{{ log.id }}</td>
+                            <td>{{ log.fecha }}</td>
+                            <td>
+                                {% if log.email %} 
+                                    <strong class="font-bold">{{ log.email }}</strong>
+                                {% else %}
+                                    <span class="text-muted">Sistema / Auto</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if 'ALARMA' in log.accion %}
+                                    <span class="text-danger">{{ log.accion }}</span>
+                                {% elif 'APERTURA' in log.accion %}
+                                    <span class="text-success">{{ log.accion }}</span>
+                                {% else %}
+                                    {{ log.accion }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
