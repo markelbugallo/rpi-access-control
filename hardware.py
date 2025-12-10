@@ -43,7 +43,6 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
             cur.execute(query, (ID_USUARIO_HARDWARE, accion))
             conn.commit()
             conn.close()
-            print(f"[BD] Acción: {accion}")
         except Exception as e:
             print(f"[BD] No se pudo guardar historial: {e}")
 
