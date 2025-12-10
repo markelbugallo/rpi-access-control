@@ -43,10 +43,9 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
             cur.execute(query, (ID_USUARIO_HARDWARE, accion))
             conn.commit()
             conn.close()
-            # Opcional: Imprimir también en consola para debug
-            print(f"[BD Guardado] Acción: {accion}")
+            print(f"[BD] Acción: {accion}")
         except Exception as e:
-            print(f"[ERROR BD] No se pudo guardar historial: {e}")
+            print(f"[BD] No se pudo guardar historial: {e}")
 
     # --- CONFIGURACIÓN GPIO ---
     GPIO.setmode(GPIO.BCM)
@@ -66,19 +65,20 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
     GPIO.output(PIN_LED_VERDE, GPIO.LOW)
     GPIO.output(PIN_LED_AZUL, GPIO.LOW)
     
-    print("[Hardware] Iniciado correctamente en Raspberry Pi.")
+    print("[SISTEMA] Hardware iniciado correctamente. Puerta bloqueada.")
 
-    # =========================================================
-    # FUNCIÓN AUXILIAR: Lógica del Código Morse (15 segundos)
-    # =========================================================
-    def ejecutar_lectura_morse():
+    # ===================================
+    # FUNCIÓN AUXILIAR: Lógica del Código 
+    # ===================================
+    def ejecutar_lectura_codigo():
         secuencia = []
         tiempo_inicio = time.time()
+        print("[PUERTA-SEGURIDAD] Esperando secuencia manual...")
         
         while True:
             # 1. Verificar si se acabó el tiempo (15s)
             if time.time() - tiempo_inicio > 15.0:
-                print("[Código] ¡Tiempo agotado! -> ALARMA")
+                print("[CODIGO] Tiempo agotado --> ¡ALARMA!")
                 memoria_estado.value = ESTADO_ALARMA
                 registrar_evento("ALARMA: Tiempo de código agotado")
                 return
@@ -97,23 +97,23 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
                 
                 # 3. Clasificar la pulsación
                 if 0.1 < duracion < 1.0:
-                    print(f" -> Corta ({duracion:.2f}s)")
+                    print(f"[CODIGO] Pulsación corta ({duracion:.2f}s)")
                     secuencia.append('C')
                 elif 2.0 <= duracion <= 3.0:
-                    print(f" -> Larga ({duracion:.2f}s)")
+                    print(f"[CODIGO] Pulsación larga ({duracion:.2f}s)")
                     secuencia.append('L')
                 else:
-                    print(f" -> Inválida ({duracion:.2f}s)")
+                    print(f"[CODIGO] Pulsación inválida ({duracion:.2f}s)")
                     secuencia.append('X')
                 
                 # 4. Comprobar si ganaste
                 if len(secuencia) == 3:
                     if secuencia == ['C', 'C', 'L']:
-                        print("[Código] ¡COMBINACIÓN CORRECTA! -> Abriendo puerta")
+                        print("[PUERTA-SEGURIDAD] Combinación CORRECTA --> Abriendo puerta")
                         memoria_estado.value = ESTADO_ABIERTO
                         registrar_evento("APERTURA: Código correcto")
                     else:
-                        print(f"[Código] Fallaste ({secuencia}) -> ALARMA")
+                        print(f"[PUERTA-SEGURIDAD] Combinación INCORRECTA ({secuencia}) --> ALARMA")
                         memoria_estado.value = ESTADO_ALARMA
                         registrar_evento(f"ALARMA: Código incorrecto {secuencia}")
                     return
@@ -141,14 +141,13 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
                     while GPIO.input(PIN_BOTON) == GPIO.HIGH:
                         # Si aguantas más de 2 segundos -> MODO CÓDIGO
                         if time.time() - start_time >= 2.0:
-                            print("[Botón] Mantenido 2s -> Iniciando secuencia...")
                             memoria_estado.value = ESTADO_ESPERANDO_CODIGO
                             
                             # Esperamos a que sueltes para empezar a leer
                             while GPIO.input(PIN_BOTON) == GPIO.HIGH: time.sleep(0.1)
                             
-                            # Llamamos a la función del morse
-                            ejecutar_lectura_morse()
+                            # Llamamos a la función del lectura del codigo
+                            ejecutar_lectura_codigo()
                             break
                         time.sleep(0.05)
                 
@@ -156,7 +155,7 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
                 elif memoria_estado.value == ESTADO_ABIERTO:
                     while GPIO.input(PIN_BOTON) == GPIO.HIGH: time.sleep(0.1)
                     memoria_estado.value = ESTADO_BLOQUEADO
-                    print("[Botón] Puerta cerrada manualmente.")
+                    print("[PUERTA-SEGURIDAD] Puerta cerrada manualmente con botón.")
                     registrar_evento("CIERRE: Botón manual")
 
             time.sleep(0.05)
@@ -192,7 +191,7 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
                     
                     # --- SITUACIÓN A: (Empresa Cerrada) ---
                     if configuracion["empresa_abierta"] == False:
-                        print("[PIR Noche] ¡INTRUSO! Alarma inmediata.")
+                        print("[SENSOR-PIR-NOCHE] ¡Intruso detectado! --> ALARMA")
                         memoria_estado.value = ESTADO_ALARMA
                         registrar_evento("ALARMA: Intruso detectado")
                     
@@ -202,7 +201,7 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
                         print(f"[PIR Día] Movimiento detectado: {contador_ciclos_dia}/3 veces.")
                         
                         if contador_ciclos_dia >= 3:
-                            print("[PIR Día] ¡Demasiado tiempo, sospechoso! -> ALARMA")
+                            print(f"[SENSOR-PIR-DIA] Movimiento detectado: {contador_ciclos_dia}/3 avisos.")
                             memoria_estado.value = ESTADO_ALARMA
                             registrar_evento("ALARMA: Movimiento persistente")
                         else:
@@ -272,34 +271,40 @@ def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacio
             try:
                 orden = cola_comunicacion.get(timeout=0.5)
                 
-                if orden == "SALIR": break
+                if orden == "SALIR":
+                    print("[SISTEMA] Recibida orden de apagado. Deteniendo hilos...")
+                    time.sleep(1.0)
+                    break
                 
                 elif orden == "ALARMA_OFF": 
                     memoria_estado.value = ESTADO_BLOQUEADO
                     # IMPORTANTE: Guardamos la hora actual para activar la pausa de 5s
                     estado_interno["ultimo_reset"] = time.time()
-                    print(" -> Alarma OFF (Pausa de 5s).")
+                    print("[WEB] Alarma silenciada. Pausa de sensor (5s).")
 
                 elif orden == "MODO_DIA": 
                     configuracion["empresa_abierta"] = True
                     # IMPORTANTE: Avisar a la web del cambio
                     memoria_modo.value = 1 
-                    print(" -> Modo DÍA.")
+                    print("[WEB] Sensor cambiado a modo DÍA.")
 
                 elif orden == "MODO_NOCHE": 
                     configuracion["empresa_abierta"] = False
                     # IMPORTANTE: Avisar a la web del cambio
                     memoria_modo.value = 0 
-                    print(" -> Modo NOCHE.")
+                    print("[WEB] Sensor cambiado a modo NOCHE.")
 
                 elif orden == "ABRIR": 
                     memoria_estado.value = ESTADO_ABIERTO
+                    print("[WEB] Abriendo puerta remotamente.")
                     
                 elif orden == "CERRAR": 
                     memoria_estado.value = ESTADO_BLOQUEADO
+                    print("[WEB] Cerrando puerta remotamente.")
 
             except queue.Empty: pass
     except KeyboardInterrupt:
-        print("\nApagando sistema...")
+        print("\n[SISTEMA] Interrupción de teclado detectada.")
     finally:
         GPIO.cleanup()
+        print("[SISTEMA] Pines liberados. Apagado completo.")

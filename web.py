@@ -1,3 +1,4 @@
+from flask import cli
 import sqlite3
 import os
 import logging
@@ -60,6 +61,7 @@ def api_login():
         session['permiso'] = usuario['permiso']
 
         registrar_evento(usuario['id'], "LOGIN_EXITOSO")
+        print(f"[WEB] Login exitoso: {email}")
         return jsonify({"status": "ok", "user": email})
     else:
         return jsonify({"status": "error", "message": "Credenciales incorrectas"}), 401
@@ -100,7 +102,9 @@ def admin_usuarios():
                 conn.execute("INSERT INTO usuarios (email, password, permiso) VALUES (?, ?, 0)", (email, pwd))
                 conn.commit()
                 registrar_evento(session['user_id'], f"CREAR_USUARIO: {email}")
+                print(f"[WEB] Admin ha creado el usuario: {email}")
             except sqlite3.IntegrityError:
+                print(f"[WEB] Error: Intento de crear email duplicado ({email})")
                 pass
 
         elif action == 'borrar':
@@ -110,6 +114,7 @@ def admin_usuarios():
                 conn.execute("DELETE FROM usuarios WHERE id=?", (user_id,))
                 conn.commit()
                 registrar_evento(session['user_id'], f"BORRAR_USUARIO_ID: {user_id}")
+                print(f"[WEB] Admin ha eliminado al usuario ID: {user_id}")
 
     # LEER USUARIOS
     usuarios = conn.execute("SELECT * FROM usuarios").fetchall()
@@ -155,14 +160,16 @@ def control(accion):
         return jsonify({"status": "error", "message": "No logueado"}), 401
 
     id = session['user_id']
-    permiso = session['permiso']
+
+    # log visual
+    print(f"[WEB] Enviando comando: {accion.upper()}")
 
     if accion == "abrir":
         web_cola_comandos.put("ABRIR")
-        registrar_evento(id, "ABRIR_REMOTO")
+        registrar_evento(id, "APERTURA: Remoto")
     elif accion == "cerrar":
         web_cola_comandos.put("CERRAR")
-        registrar_evento(id, "CERRAR_REMOTO")
+        registrar_evento(id, "CIERRE: Remoto")
     elif accion == "alarma_off":
         web_cola_comandos.put("ALARMA_OFF")
         registrar_evento(id, "DESACTIVAR_ALARMA")
@@ -185,7 +192,11 @@ def iniciar_servidor_web(memoria_estado, memoria_pir, memoria_modo, cola):
     web_memoria_modo = memoria_modo
     web_cola_comandos = cola
 
+    # silencia logs de peticiones de la terminal
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
+
+    # silencia banner de arranque flask
+    cli.show_server_banner = lambda *_: None
     
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)

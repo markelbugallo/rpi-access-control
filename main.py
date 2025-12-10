@@ -20,20 +20,21 @@ def comprobar_e_instalar_bd():
             tamano_valido = True
 
     if not tamano_valido:
-        print("[AVISO] La base de datos no existe o está vacía/corrupta.")
+        print("[MAIN] AVISO: La base de datos no existe o está vacía.")
         
         # Verificar que existe el script de setup
         if not os.path.exists(RUTA_SETUP):
-            print(f"[ERROR CRÍTICO] No encuentro el archivo de instalación en: {RUTA_SETUP}")
+            print(f"[ERROR] No encuentro el archivo de instalación en: {RUTA_SETUP}")
             sys.exit(1)
 
         try:
             if existe: 
                 os.remove(RUTA_DB)
 
+            print(f"[MAIN] Ejecutando instalación: {RUTA_SETUP}")
             # Ejecutar el setup como un subproceso
             subprocess.run([sys.executable, RUTA_SETUP], check=True)
-            print("\n[Main] Instalación completada. Continuando arranque...\n")
+            print("\n[MAIN] Instalación completada.\n")
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] El setup falló con código {e.returncode}.")
             sys.exit(1)
@@ -41,7 +42,7 @@ def comprobar_e_instalar_bd():
             print(f"[ERROR] Fallo inesperado al lanzar setup: {e}")
             sys.exit(1)
     else:
-        print("[Main] Base de datos encontrada. Todo correcto.")
+        print("[MAIN] Base de datos verificada correctamente.")
 
 if __name__ == '__main__':
     comprobar_e_instalar_bd()
@@ -56,6 +57,8 @@ if __name__ == '__main__':
     proc_hw = multiprocessing.Process(target=proceso_hardware, args=(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion))
     proc_web = multiprocessing.Process(target=iniciar_servidor_web, args=(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion))
 
+    print("[MAIN] Iniciando sistema de seguridad")
+
     proc_hw.start()
     proc_web.start()
 
@@ -67,9 +70,9 @@ if __name__ == '__main__':
         proc_hw.join(timeout=2)
 
         if proc_hw.is_alive():
-            print("[Main] El hardware tardaba mucho, forzando cierre...")
+            print("[MAIN] El hardware tardaba mucho, forzando cierre...")
             proc_hw.terminate()
 
         proc_web.terminate()
 
-        print("[Main] Sistema apagado completamente.")
+        print("[MAIN] Sistema apagado completamente.")
