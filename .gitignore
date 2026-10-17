@@ -1,0 +1,141 @@
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ==============================================================================
+# Virtual Environments & Package Managers
+# ==============================================================================
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==============================================================================
+# Distribution / Packaging
+# ==============================================================================
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==============================================================================
+# Database & Local Persistent Data
+# ==============================================================================
+# Ignore all SQLite database files (contains admin credentials and access history)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Keep data directory tracked, but ignore generated databases inside
+data/*.db
+data/*.sqlite*
+!data/.gitkeep
+
+# ==============================================================================
+# Logs & Temporary Files
+# ==============================================================================
+*.log
+logs/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# ==============================================================================
+# Secrets, Environment Variables & Credentials
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+*.secret
+*.pem
+*.key
+*.cert
+!*.example
+
+# ==============================================================================
+# IDEs and Code Editors
+# ==============================================================================
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm & JetBrains IDEs
+.idea/
+*.iws
+*.iml
+
+# Vim / Emacs
+*~
+.*.sw[a-z]
+#*#
+.#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ==============================================================================
+# Operating System Files
+# ==============================================================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# ==============================================================================
+# Testing, Coverage & Linters
+# ==============================================================================
+.coverage
+.coverage.*
+.cache
+coverage.xml
+nosetests.xml
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
