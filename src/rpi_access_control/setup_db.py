@@ -2,16 +2,12 @@ import sqlite3
 import os
 import getpass
 
+from .config import DATA_DIR, DB_PATH
+
 def main():
     print("========================================")
     print("   CONFIGURACIÓN INICIAL DEL SISTEMA    ")
     print("========================================")
-
-    # CONFIGURACION DE RUTAS
-    CARPETA_SCRIPTS = os.path.dirname(os.path.abspath(__file__))
-    CARPETA_PROYECTO = os.path.dirname(CARPETA_SCRIPTS)
-    DATA_DIR = os.path.join(CARPETA_PROYECTO, 'data')
-    DB_PATH = os.path.join(DATA_DIR, 'accesos.db')
 
     # COMPROBAR SI YA EXISTE LA BD (en ese caso se detiene)
     if os.path.exists(DB_PATH):

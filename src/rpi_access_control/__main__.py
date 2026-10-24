@@ -2,15 +2,11 @@ import multiprocessing
 import os
 import subprocess
 import sys
-from hardware import proceso_hardware, ESTADO_BLOQUEADO
-from web import iniciar_servidor_web
+from .config import DB_PATH as RUTA_DB
+from .hardware import proceso_hardware, ESTADO_BLOQUEADO
+from .web import iniciar_servidor_web
 
 def comprobar_e_instalar_bd():
-    # CONFIGURAR RUTAS
-    CARPETA_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-    RUTA_DB = os.path.join(CARPETA_PROYECTO, 'data', 'accesos.db')
-    RUTA_SETUP = os.path.join(CARPETA_PROYECTO, 'scripts', 'setup-db.py')
-
     # Comprobar si existe la BD
     existe = os.path.exists(RUTA_DB)
     tamano_valido = False
@@ -22,18 +18,13 @@ def comprobar_e_instalar_bd():
     if not tamano_valido:
         print("[MAIN] AVISO: La base de datos no existe o está vacía.")
         
-        # Verificar que existe el script de setup
-        if not os.path.exists(RUTA_SETUP):
-            print(f"[ERROR] No encuentro el archivo de instalación en: {RUTA_SETUP}")
-            sys.exit(1)
-
         try:
             if existe: 
                 os.remove(RUTA_DB)
 
-            print(f"[MAIN] Ejecutando instalación: {RUTA_SETUP}")
+            print("[MAIN] Ejecutando instalación")
             # Ejecutar el setup como un subproceso
-            subprocess.run([sys.executable, RUTA_SETUP], check=True)
+            subprocess.run([sys.executable, '-m', 'rpi_access_control.setup_db'], check=True)
             print("\n[MAIN] Instalación completada.\n")
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] El setup falló con código {e.returncode}.")
@@ -44,7 +35,7 @@ def comprobar_e_instalar_bd():
     else:
         print("[MAIN] Base de datos verificada correctamente.")
 
-if __name__ == '__main__':
+def main():
     comprobar_e_instalar_bd()
 
     # MEMORIAS COMPARTIDAS
@@ -76,3 +67,6 @@ if __name__ == '__main__':
         proc_web.terminate()
 
         print("[MAIN] Sistema apagado completamente.")
+
+if __name__ == "__main__":
+    main()
