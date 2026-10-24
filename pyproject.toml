@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rpi-access-control"
+version = "0.1.0"
+description = "Raspberry Pi access control and monitoring system with a Flask web dashboard"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "Flask",
+    "RPi.GPIO",
+]
+
+[project.scripts]
+rpi-access-control = "rpi_access_control.__main__:main"
+rpi-access-control-setup = "rpi_access_control.setup_db:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rpi_access_control = ["templates/*.html", "static/*"]

@@ -2,8 +2,9 @@ import sqlite3
 import threading
 import time
 import queue
-import os
 import RPi.GPIO as GPIO
+
+from .config import DB_PATH
 
 # ==========================================
 # 1. CONFIGURACIÓN DE PINES (BCM)
@@ -27,9 +28,6 @@ ID_USUARIO_HARDWARE = 2
 
 
 def proceso_hardware(memoria_estado, memoria_pir, memoria_modo, cola_comunicacion):
-
-    CARPETA_ACTUAL = os.path.dirname(os.path.abspath(__file__))
-    DB_PATH = os.path.join(CARPETA_ACTUAL, 'data', 'accesos.db')
 
     configuracion = {"empresa_abierta": True}
     estado_interno = {"ultimo_reset": 0}
