@@ -1,8 +1,9 @@
 from flask import cli
 import sqlite3
-import os
 import logging
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+
+from .config import DB_PATH as DB_NAME
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta_proyecto" 
@@ -12,10 +13,6 @@ web_memoria_estado = None
 web_memoria_pir = None
 web_memoria_modo = None
 web_cola_comandos = None
-
-# CONFIGURACION DE RUTAS
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, 'data', 'accesos.db')
 
 # FUNCIONES AUXILIARES
 def get_db_connection():
