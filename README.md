@@ -20,3 +20,24 @@ A **Flask-based web server** provides a secure dashboard for administrators:
 * **Real-time Monitoring:** View the current status of the door and sensors.
 * **Remote Actions:** Open/Close door, toggle Alarm, and switch Day/Night modes.
 * **Event Logging:** A comprehensive history of physical and digital events is stored in a SQLite database.
+
+## Project Structure
+```
+├── pyproject.toml
+├── data/                      # SQLite database (generated, git-ignored)
+└── src/rpi_access_control/
+    ├── __main__.py            # entry point: DB check + hardware/web processes
+    ├── config.py              # shared paths
+    ├── hardware.py            # GPIO / state machine process
+    ├── web.py                 # Flask app
+    ├── setup_db.py            # first-run DB + admin creation
+    ├── templates/
+    └── static/
+```
+
+## Usage
+```bash
+pip install -e .
+python -m rpi_access_control      # or: rpi-access-control
+```
+On first run the database is created interactively (`python -m rpi_access_control.setup_db`).
